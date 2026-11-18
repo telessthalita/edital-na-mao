@@ -61,3 +61,9 @@ def test_sem_chave_responde_503(services):
     services.model = None
     client = TestClient(create_app(services))
     assert client.post("/api/chat", json={"mensagem": "oi"}).status_code == 503
+
+
+def test_carrega_editais_de_exemplo_ao_subir(services):
+    with TestClient(create_app(services)) as client:
+        ids = {d["id"] for d in client.get("/api/editais").json()}
+    assert ids == {"vila-serena-01-2026", "vale-azul-02-2026"}

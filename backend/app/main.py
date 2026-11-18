@@ -20,6 +20,7 @@ from .config import Settings, get_settings
 from .llm.base import ChatModel, Embedder, LLMError
 from .rag.ingest import ingest_pdf
 from .rag.pdf import PdfError
+from .rag.seed import seed_from_manifest
 from .rag.store import MemoryStore, Store
 
 log = logging.getLogger("edital")
@@ -85,6 +86,11 @@ def create_app(services: Services | None = None) -> FastAPI:
         if not hasattr(app.state, "services"):
             app.state.services = build_services(get_settings())
         s = app.state.services
+        if s.settings.seed_on_startup and s.embedder and not s.store.list_documents():
+            try:
+                seed_from_manifest(s.store, s.embedder)
+            except Exception:  # sem edital a API ainda sobe; o erro fica no log
+                log.exception("Falha ao carregar os editais de exemplo")
         log.warning(
             "Edital na mão: banco=%s ia=%s upload=%s",
             s.store.kind,

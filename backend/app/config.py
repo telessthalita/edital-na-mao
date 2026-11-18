@@ -19,6 +19,8 @@ class Settings(BaseSettings):
     # Banco: vazio = store em memória (salvo em disco em memory_store_dir)
     database_url: str = ""
     memory_store_dir: str = str(ROOT_DIR / "data" / "store")
+    # Banco vazio ao subir? Carrega os editais de data/editais/editais.json.
+    seed_on_startup: bool = True
 
     # Agente
     agent_max_steps: int = 6
