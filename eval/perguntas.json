@@ -1,0 +1,23 @@
+[
+  {"edital": "vila-serena-01-2026", "pergunta": "Quanto ganha o analista de TI?", "esperado": "R$ 6.850,00"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Qual o preço da inscrição pra quem tem só o ensino médio?", "esperado": "R$ 85,00"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Que dia vai ser a prova?", "esperado": "14 de março de 2027"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Quantas questões da área de TI caem pra analista?", "esperado": "Conhecimentos Específicos: 40 questões"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Quem não precisa pagar a inscrição?", "esperado": "Cadastro Único"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Qual a nota mínima pra passar?", "esperado": "50% (cinquenta por cento)"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Quantos pontos vale ter mestrado?", "esperado": "1,0 (um) ponto"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Quanto tempo eu tenho pra contestar o gabarito?", "esperado": "2 (dois) dias úteis"},
+  {"edital": "vila-serena-01-2026", "pergunta": "O que estudar de banco de dados?", "esperado": "normalização"},
+  {"edital": "vila-serena-01-2026", "pergunta": "O que faz o técnico em informática no dia a dia?", "esperado": "suporte técnico aos usuários"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Tem cota pra PcD?", "esperado": "5% (cinco por cento)"},
+  {"edital": "vila-serena-01-2026", "pergunta": "O que eu levo no dia da prova?", "esperado": "documento oficial de identificação com foto"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Quando abrem as inscrições?", "esperado": "5 de janeiro de 2027"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Quanto é o vale alimentação?", "esperado": "R$ 750,00"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Por quanto tempo o concurso vale?", "esperado": "2 (dois) anos"},
+  {"edital": "vila-serena-01-2026", "pergunta": "Como funciona o desempate?", "esperado": "jurado"},
+  {"edital": "vale-azul-02-2026", "pergunta": "É concursado estatutário ou carteira assinada?", "esperado": "Consolidação das Leis do Trabalho"},
+  {"edital": "vale-azul-02-2026", "pergunta": "Cai inglês na prova de analista?", "esperado": "Língua Inglesa: 10 questões"},
+  {"edital": "vale-azul-02-2026", "pergunta": "Qual o salário do analista de sistemas?", "esperado": "R$ 7.400,00"},
+  {"edital": "vale-azul-02-2026", "pergunta": "Quanto preciso acertar pra não ser eliminado?", "esperado": "60% (sessenta por cento)"},
+  {"edital": "vale-azul-02-2026", "pergunta": "Pede Git ou Docker no conteúdo?", "esperado": "controle de versão com Git"}
+]
