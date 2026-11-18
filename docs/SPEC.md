@@ -43,13 +43,13 @@ O Edital na mão deixa a pessoa conversar com o edital. Toda resposta aponta a p
 - OCR de PDF escaneado (só PDF com texto).
 
 ## Como saber que ficou pronto
-- [ ] `pytest` passa: chunking, fusão RRF, ferramentas, loop do agente (com LLM falso) e API.
-- [ ] Com chave do Gemini e um edital carregado, a pergunta "quais as matérias de conhecimentos específicos e quantos dias faltam pra prova?" faz o agente chamar `buscar_trecho` e depois `calcular_dias_ate_prova`, e a resposta cita página certa.
-- [ ] Pergunta sobre algo que não está no edital volta "não achei no edital", sem inventar.
-- [ ] Script de avaliação roda e mostra a tabela vetor x texto x híbrida.
-- [ ] Frontend mostra resposta, citação e trace, rodando local de ponta a ponta.
+- [x] `pytest` passa: chunking, fusão RRF, ferramentas, loop do agente (com LLM falso) e API.
+- [x] Com chave do Gemini e um edital carregado, a pergunta "quais as matérias de conhecimentos específicos e quantos dias faltam pra prova?" faz o agente chamar `buscar_trecho` e depois `calcular_dias_ate_prova`, e a resposta cita página certa.
+- [x] Pergunta sobre algo que não está no edital volta "não achei no edital", sem inventar.
+- [x] Script de avaliação roda e mostra a tabela vetor x texto x híbrida.
+- [x] Frontend mostra resposta, citação e trace, rodando local de ponta a ponta.
 - [ ] Caminho de deploy combinado com a Thalita (ver abaixo) e documentado.
-- [ ] README em português com versão em inglês recolhida, explicando arquitetura do agente, do RAG e as decisões.
+- [x] README em português com versão em inglês recolhida, explicando arquitetura do agente, do RAG e as decisões.
 
 ## Stack e decisões
 | Parte | Escolha | Por quê |

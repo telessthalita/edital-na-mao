@@ -10,7 +10,7 @@ services:
       - key: DATABASE_URL
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.8-flash
       - key: ALLOW_UPLOAD
         value: "false"
       - key: RATE_LIMIT_CHAT_PER_HOUR

@@ -12,7 +12,9 @@ class Settings(BaseSettings):
 
     # IA
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.8-flash"
+    # Usados quando o principal está sobrecarregado (503) ou sem cota (429).
+    gemini_fallback_models: str = "gemini-3.5-flash-lite,gemini-3.1-flash-lite"
     gemini_embed_model: str = "gemini-embedding-001"
     embed_dim: int = 768
 

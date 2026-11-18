@@ -33,7 +33,7 @@ flowchart LR
         T -- busca híbrida --> DB
         T -- resultado --> AG
         AG -- resposta + citações + trace --> U
-        AG <--> LLM[Gemini 2.5 Flash<br/>function calling]
+        AG <--> LLM[Gemini 3.8 Flash<br/>function calling]
     end
 ```
 
@@ -69,12 +69,13 @@ Uma pergunta como "quais as matérias de específicos e quantos dias faltam pra 
 - **Citação verificável**: cada trecho que volta de uma ferramenta ganha um número. O modelo cita `[n]`, e a API **apaga qualquer `[n]` que nenhuma ferramenta devolveu**. Citação inventada não chega na tela.
 - **Erro de ferramenta volta pro modelo** como resultado (`{"erro": "Data inválida, use AAAA-MM-DD"}`), e ele se corrige na rodada seguinte.
 - **Limite de passos** (6). Se bater, o modelo é chamado uma última vez sem ferramentas e responde com o que já tem.
+- **Fallback de modelo** (`llm/fallback.py`): no tier gratuito o modelo principal às vezes responde 503 ("high demand"). Aconteceu no primeiro teste real, com todos os modelos Flash ao mesmo tempo. Agora, se o principal falha por sobrecarga, cota ou rede, a pergunta vai pro próximo da lista (`gemini-3.5-flash-lite`, depois `gemini-3.1-flash-lite`), e o que falhou fica 5 minutos de castigo pra próxima pergunta não perder tempo nele. Como o Gemini assina o raciocínio de cada turno (*thought signature*) e um modelo não aceita a assinatura de outro, o histórico que veio de outro modelo vai com a assinatura coringa que o Google documenta pra esse caso.
 - **Prompt de sistema** com as regras: só afirmar o que veio da busca, tentar de novo com sinônimos do edital, dizer "não achei" quando não achar, não opinar sobre banca nem chance de aprovação.
 - **Demo pública protegida**: limite por IP, upload desligado e tamanho máximo de PDF, pra cota gratuita do Gemini não estourar.
 
 ### Camada de provedor
 
-O agente não sabe que está falando com o Gemini. Ele conversa com duas interfaces (`llm/base.py`): `ChatModel.generate(system, messages, tools)` e `Embedder.embed(texts, task)`. A implementação do Gemini usa a API REST direto com `httpx`, sem SDK, o que deixa o protocolo de function calling visível no código (inclusive o detalhe de devolver as *thought signatures* do Gemini 2.5 intactas no turno seguinte). Trocar por Groq, Ollama ou Claude é escrever outra classe.
+O agente não sabe que está falando com o Gemini. Ele conversa com duas interfaces (`llm/base.py`): `ChatModel.generate(system, messages, tools)` e `Embedder.embed(texts, task)`. A implementação do Gemini usa a API REST direto com `httpx`, sem SDK, o que deixa o protocolo de function calling visível no código (inclusive o detalhe de devolver as *thought signatures* do Gemini intactas no turno seguinte). Trocar por Groq, Ollama ou Claude é escrever outra classe.
 
 ## Avaliação
 
@@ -89,7 +90,15 @@ python -m scripts.avaliar            # com embeddings do Gemini
 python -m scripts.avaliar --offline  # sem rede, embeddings por hashing
 ```
 
-Resultado com embeddings por hashing (`--offline`, sem nenhum entendimento de significado):
+Resultado com `gemini-embedding-001` (768 dimensões), 21 perguntas:
+
+| Modo | hit@1 | hit@5 | MRR |
+| --- | --- | --- | --- |
+| Só vetor | 90% | 100% | 0.95 |
+| Só texto (BM25) | 57% | 86% | 0.70 |
+| Híbrida (RRF) | 90% | 100% | 0.94 |
+
+E com embeddings por hashing (`--offline`, que não entendem significado nenhum):
 
 | Modo | hit@1 | hit@5 | MRR |
 | --- | --- | --- | --- |
@@ -97,11 +106,11 @@ Resultado com embeddings por hashing (`--offline`, sem nenhum entendimento de si
 | Só texto (BM25) | 57% | 86% | 0.70 |
 | Híbrida (RRF) | 52% | 100% | 0.72 |
 
-_Resultado com embeddings do Gemini: entra aqui depois da rodada com a chave._
+O que eu tiro disso, sem enfeitar:
 
-O que a tabela mostra: cada busca sozinha deixa pergunta pra trás; a híbrida é a única que acha todas no top 5. É esse "não perder nenhuma" que importa pro agente, porque ele recebe os 6 primeiros trechos e o modelo escolhe.
-
-Com dois editais fictícios curtos o top 5 é fácil. O próximo passo é rodar a mesma avaliação em editais reais de 100+ páginas.
+- Com um embedding bom, **a busca vetorial sozinha já resolve quase tudo nesse conjunto**, e a híbrida empata (MRR 0.94 contra 0.95). A busca por palavra sozinha perde feio em pergunta coloquial ("é concursado ou carteira assinada?" não tem nenhuma palavra em comum com "Consolidação das Leis do Trabalho").
+- Quando o vetor é fraco (o modo offline), a híbrida é a única que acha todas no top 5. Ou seja: o RRF funciona como **seguro**. Custa uma busca por texto a mais e quase nada de qualidade quando o vetor está bom.
+- Mantive a híbrida porque edital real tem muito termo exato (número de lei, código de cargo, "Anexo IV") e esse conjunto de teste é pequeno e fictício. Ainda falta provar isso com números: o próximo passo é rodar a mesma avaliação em editais reais de 100+ páginas e com perguntas de termo exato.
 
 ## Decisões
 
@@ -165,7 +174,8 @@ Os testes não usam rede: o Gemini é trocado por um modelo com roteiro (`Script
 | Variável | Pra que serve | Padrão |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | Chave do Gemini. Sem ela a API sobe, mas chat e upload ficam desligados | vazio |
-| `GEMINI_MODEL` | Modelo de chat | `gemini-2.5-flash` |
+| `GEMINI_MODEL` | Modelo de chat | `gemini-3.8-flash` |
+| `GEMINI_FALLBACK_MODELS` | Modelos tentados, em ordem, quando o principal está sobrecarregado. Vazio = sem fallback | `gemini-3.5-flash-lite,gemini-3.1-flash-lite` |
 | `GEMINI_EMBED_MODEL` / `EMBED_DIM` | Modelo e dimensão do embedding | `gemini-embedding-001` / `768` |
 | `DATABASE_URL` | Postgres com pgvector. Vazio = store em memória | vazio |
 | `SEED_ON_STARTUP` | Carrega os editais de `data/editais` se o banco estiver vazio | `true` |
@@ -225,11 +235,13 @@ The demo notices are **fictional** (generated by a script).
 
 **Guardrails**: every retrieved chunk gets a number and the model cites `[n]`; the API strips any `[n]` no tool returned, so fabricated citations never reach the UI. Tool errors go back to the model as results so it can self-correct. Step limit with a final no-tools call. System prompt rules: only state what retrieval returned, retry with the notice's vocabulary, say "not found" when not found. Public demo has per-IP rate limits and uploads disabled.
 
-**Provider layer**: the agent only knows `ChatModel` and `Embedder` interfaces. The Gemini implementation calls the REST API directly with `httpx` (including passing Gemini 2.5 thought signatures back untouched). Swapping to Groq, Ollama or Claude means writing another class.
+**Provider layer**: the agent only knows `ChatModel` and `Embedder` interfaces. The Gemini implementation calls the REST API directly with `httpx` (including passing Gemini thought signatures back untouched). Swapping to Groq, Ollama or Claude means writing another class.
 
 ### Evaluation
 
-`eval/perguntas.json` holds 21 questions phrased the way people ask, each with the snippet that must be retrieved. `python -m scripts.avaliar` reports hit@1, hit@5 and MRR for vector-only, text-only and hybrid search. With offline hashing embeddings, hybrid is the only mode that finds every answer in the top 5 (100% vs 90% and 86%).
+`eval/perguntas.json` holds 21 questions phrased the way people ask, each with the snippet that must be retrieved. `python -m scripts.avaliar` reports hit@1, hit@5 and MRR for vector-only, text-only and hybrid search. With `gemini-embedding-001`, vector-only search already gets 90% hit@1 and MRR 0.95, and hybrid ties (0.94); keyword-only lags (0.70) on colloquial questions. With weak offline hashing embeddings, hybrid is the only mode that finds every answer in the top 5. So RRF acts as insurance: almost free when embeddings are good, decisive when they are not. Proving its value on large real notices with exact-term questions is the next step.
+
+**Model fallback**: on the free tier the primary model sometimes returns 503 "high demand" (it happened on the first real run). `FallbackChatModel` moves to the next model in the list and puts the failing one on a 5-minute cooldown. History produced by a different model is sent with Google's documented placeholder thought signature.
 
 ### Key decisions
 

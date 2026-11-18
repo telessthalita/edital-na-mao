@@ -45,10 +45,17 @@ def build_services(settings: Settings) -> Services:
         store = MemoryStore(settings.memory_store_dir)
     embedder = model = None
     if settings.gemini_api_key:
+        from .llm.fallback import FallbackChatModel
         from .llm.gemini import GeminiChatModel, GeminiEmbedder
 
         embedder = GeminiEmbedder(settings.gemini_api_key, settings.gemini_embed_model, settings.embed_dim)
-        model = GeminiChatModel(settings.gemini_api_key, settings.gemini_model)
+        nomes = [settings.gemini_model] + [n.strip() for n in settings.gemini_fallback_models.split(",") if n.strip()]
+        nomes = list(dict.fromkeys(nomes))
+        if len(nomes) == 1:
+            model = GeminiChatModel(settings.gemini_api_key, nomes[0])
+        else:
+            # com fallback, 1 retentativa por modelo basta: melhor trocar de modelo do que esperar
+            model = FallbackChatModel([GeminiChatModel(settings.gemini_api_key, n, retries=1) for n in nomes])
     return Services(settings, store, embedder, model, build_tools())
 
 
@@ -191,7 +198,8 @@ def create_app(services: Services | None = None) -> FastAPI:
             arquivo = (dist / path).resolve()
             if path and arquivo.is_file() and dist.resolve() in arquivo.parents:
                 return FileResponse(arquivo)
-            return FileResponse(dist / "index.html")
+            # index.html sem cache: depois de um deploy o navegador pega o bundle novo
+            return FileResponse(dist / "index.html", headers={"Cache-Control": "no-cache"})
 
     return app
 

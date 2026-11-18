@@ -140,7 +140,7 @@ export default function App() {
               <span className="ponto" />
               <span className="ponto" />
               <span className="ponto" />
-              <span className="sr">Lendo o edital…</span>
+              <span className="pensando-texto">Lendo o edital… pode levar uns 20 segundos</span>
             </div>
           )}
           {erro && <div className="erro-msg">{erro}</div>}

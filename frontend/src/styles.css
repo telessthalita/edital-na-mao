@@ -124,6 +124,7 @@ button.ref:hover { background: var(--marca-forte); }
 .ponto:nth-child(2) { animation-delay: 0.15s; }
 .ponto:nth-child(3) { animation-delay: 0.3s; }
 @keyframes pulsa { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+.pensando-texto { margin-left: 6px; font-size: 13px; color: var(--tinta-2); }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .erro-msg { color: var(--erro); font-size: 14px; }
 

@@ -21,15 +21,16 @@ def test_schema_vira_tipos_maiusculos():
 
 
 def test_conteudo_preserva_raw_e_function_response():
-    raw = {"role": "model", "parts": [{"functionCall": {"name": "x", "args": {}}, "thoughtSignature": "abc"}]}
+    content = {"role": "model", "parts": [{"functionCall": {"name": "x", "args": {}}, "thoughtSignature": "abc"}]}
     contents = to_gemini_contents(
         [
             Message("user", "oi"),
-            Message("assistant", tool_calls=[ToolCall("x", {})], raw=raw),
+            Message("assistant", tool_calls=[ToolCall("x", {})], raw={"model": "m", "content": content}),
             Message("tool", tool_results=[ToolResult("x", {"ok": 1})]),
-        ]
+        ],
+        "m",
     )
-    assert contents[1] is raw  # assinatura de pensamento volta intacta
+    assert contents[1] is content  # assinatura de pensamento volta intacta
     assert contents[2] == {"role": "user", "parts": [{"functionResponse": {"name": "x", "response": {"ok": 1}}}]}
 
 
@@ -77,3 +78,21 @@ def test_embedder_em_lotes_e_normaliza():
     out = emb.embed(["t"] * 150, "consulta")
     assert tamanhos == [100, 50]
     assert out.shape == (150, 2) and np.allclose(out[0], [0.6, 0.8])
+
+
+def test_historico_de_outro_modelo_usa_assinatura_coringa():
+    raw = {"model": "modelo-a", "content": {"role": "model", "parts": [{"functionCall": {"name": "x", "args": {}}, "thoughtSignature": "sig-a"}]}}
+    msg = Message("assistant", tool_calls=[ToolCall("x", {})], raw=raw)
+    assert to_gemini_contents([msg], "modelo-a")[0]["parts"][0]["thoughtSignature"] == "sig-a"
+    assert to_gemini_contents([msg], "modelo-b")[0]["parts"][0]["thoughtSignature"] == "skip_thought_signature_validator"
+
+
+def test_503_vira_erro_transitorio():
+    import pytest
+
+    from app.llm.base import LLMError
+
+    client = httpx.Client(transport=httpx.MockTransport(lambda req: httpx.Response(503, json={})))
+    with pytest.raises(LLMError) as exc:
+        GeminiChatModel("k", client=client, retries=0).generate("s", [Message("user", "oi")], [])
+    assert exc.value.transient and exc.value.status == 503
