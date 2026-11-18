@@ -125,6 +125,145 @@ O que eu tiro disso, sem enfeitar:
 | Ferramentas determinísticas pra conta | LLM erra data e proporção | Menos "mágica", mais código |
 | Citação numerada e validada no backend | Resposta conferível; ref inventada some | O modelo precisa seguir o formato |
 
+## Detalhes técnicos
+
+### Stack
+
+| Camada | Tecnologia |
+| --- | --- |
+| API | Python 3.11+ (Docker usa 3.12), FastAPI, Uvicorn, Pydantic Settings |
+| PDF | pypdf |
+| Vetores e busca | numpy (store em memória, BM25 próprio) / Postgres + pgvector (HNSW) + full text `portuguese` |
+| Banco | psycopg 3 + psycopg-pool, pgvector-python |
+| IA | Gemini via REST com httpx: `gemini-3.8-flash` (chat, function calling), `gemini-embedding-001` (768 dim) |
+| Frontend | React 18, Vite 5, TypeScript, CSS puro (sem biblioteca de UI) |
+| Testes | pytest, `httpx.MockTransport`, `fastapi.testclient` |
+| Deploy | Docker multi-stage (Node builda o front, Python serve tudo), Render |
+
+### Fluxo de uma pergunta
+
+```mermaid
+sequenceDiagram
+    participant F as Frontend
+    participant A as FastAPI
+    participant L as Loop do agente
+    participant G as Gemini
+    participant T as Ferramentas
+    participant S as Store
+    F->>A: POST /api/chat {mensagem, historico, edital_id}
+    A->>L: run_agent(pergunta, contexto)
+    L->>G: system + conversa + 5 tool schemas
+    G-->>L: functionCall buscar_trecho(pergunta)
+    L->>T: buscar_trecho
+    T->>G: embedding da pergunta (RETRIEVAL_QUERY)
+    T->>S: busca vetorial (top 20) + busca texto (top 20)
+    S-->>T: candidatos
+    T-->>L: top 6 após RRF, cada um com ref [n] e página
+    L->>G: functionResponse com os trechos
+    G-->>L: functionCall calcular_dias_ate_prova("2027-03-14")
+    L->>T: conta determinística
+    L->>G: functionResponse {dias: 116}
+    G-->>L: texto final com [1] [3]
+    L->>L: remove refs inventadas, monta citações e trace
+    L-->>A: AgentResult
+    A-->>F: {resposta, citacoes, trace, modelo, ms}
+```
+
+### Endpoints
+
+| Método | Rota | O que faz | Erros |
+| --- | --- | --- | --- |
+| `GET` | `/api/health` | Banco em uso, se a IA está ligada, modelo e se aceita upload | |
+| `GET` | `/api/editais` | Lista os editais carregados | |
+| `POST` | `/api/editais` | Upload de PDF (`multipart`: `arquivo`, `titulo`, `fonte_url` opcional) | 403 upload desligado, 413 grande demais, 415 não é PDF, 422 PDF sem texto ou com páginas demais, 429 limite |
+| `POST` | `/api/chat` | Pergunta pro agente | 404 edital inexistente, 429 limite ou cota, 502/503 Gemini fora, 503 sem chave |
+
+Exemplo de resposta do `/api/chat` (encurtado, saída real):
+
+```json
+{
+  "resposta": "A prova está marcada para o dia 14 de março de 2027 [3]. ... faltam 116 dias (ou 82 dias úteis).",
+  "citacoes": [
+    {
+      "n": 3,
+      "edital_id": "vila-serena-01-2026",
+      "edital": "Prefeitura de Vila Serena 01/2026 (fictício)",
+      "pagina": 2,
+      "secao": "6. DAS PROVAS",
+      "trecho": "6.1 A prova objetiva será aplicada no dia 14 de março de 2027, das 9h às 13h...",
+      "fonte_url": null
+    }
+  ],
+  "trace": [
+    {"passo": 1, "ferramenta": "buscar_trecho", "argumentos": {"pergunta": "data da prova Analista de TI", "edital_id": "vila-serena-01-2026"}, "resumo": "6 trechos (pág. 1, 2, 3, 4)", "ms": 812, "erro": false},
+    {"passo": 2, "ferramenta": "calcular_dias_ate_prova", "argumentos": {"data_prova": "2027-03-14"}, "resumo": "116 dias (16.6 semanas, 82 dias úteis)", "ms": 0, "erro": false}
+  ],
+  "passos": 3,
+  "modelo": "gemini-3.5-flash-lite",
+  "ms": 28250,
+  "limite_atingido": false
+}
+```
+
+A API é stateless: o histórico da conversa vai do frontend em cada pedido (últimas 8 mensagens), e as refs `[n]` de respostas antigas são tiradas do histórico porque a numeração recomeça a cada pergunta.
+
+### Modelo de dados (Postgres)
+
+```sql
+editais (id text pk, titulo, paginas, total_trechos, fonte_url, criado_em)
+trechos (
+  id text pk,                -- "<edital_id>#<ordem>"
+  edital_id text fk -> editais on delete cascade,
+  ordem, pagina, secao, texto,
+  embedding vector(768),
+  tsv tsvector generated always as (to_tsvector('portuguese', secao || ' ' || texto)) stored
+)
+-- índices: hnsw (embedding vector_cosine_ops), gin (tsv), btree (edital_id)
+```
+
+O schema completo está em [`backend/sql/schema.sql`](backend/sql/schema.sql) e é aplicado sozinho quando a API sobe com `DATABASE_URL`. RLS fica ligado sem política: a API usa a connection string direto, e ninguém lê as tabelas pela API pública do Supabase. A conexão usa `prepare_threshold=None` porque o pooler do Supabase em modo transaction não aceita prepared statements.
+
+### Parâmetros do RAG e do agente
+
+| Parâmetro | Valor | Onde |
+| --- | --- | --- |
+| Tamanho do trecho | até ~900 caracteres | `rag/chunking.py` |
+| Sobreposição | 150 caracteres | `rag/chunking.py` |
+| Cabeçalho/rodapé | linha nas 2 primeiras ou 2 últimas de 60%+ das páginas | `rag/pdf.py` |
+| Candidatos por busca | 20 do vetor + 20 do texto | `rag/retrieval.py` |
+| Constante do RRF | 60 | `rag/retrieval.py` |
+| Trechos entregues ao modelo | 6 (`SEARCH_TOP_K`) | `config.py` |
+| BM25 (store em memória) | k1 = 1.5, b = 0.75 | `rag/store.py` |
+| Passos do agente | 6 (`AGENT_MAX_STEPS`) | `agent/loop.py` |
+| Histórico enviado | últimas 8 mensagens, até 4.000 caracteres cada | `agent/loop.py` |
+| Pausa do modelo que falhou | 5 minutos | `llm/fallback.py` |
+
+### Function calling no Gemini (o que vai no fio)
+
+As ferramentas são declaradas em JSON Schema e convertidas pro formato que o Gemini aceita (tipos em maiúsculo):
+
+```json
+{"tools": [{"functionDeclarations": [{
+  "name": "calcular_dias_ate_prova",
+  "description": "Calcula quantos dias, semanas e dias úteis faltam de hoje até a data da prova.",
+  "parameters": {"type": "OBJECT", "properties": {"data_prova": {"type": "STRING"}}, "required": ["data_prova"]}
+}]}]}
+```
+
+O modelo devolve `{"functionCall": {"name": ..., "args": ...}}`, o loop executa e responde com um turno `user` contendo `{"functionResponse": {"name": ..., "response": {...}}}`. O turno do modelo volta inteiro no pedido seguinte, com a `thoughtSignature`, porque o Gemini 3 recusa function call sem a assinatura do próprio raciocínio.
+
+### Testes
+
+32 testes, todos sem rede (`cd backend && pytest`):
+
+| Arquivo | Cobre |
+| --- | --- |
+| `test_rag.py` | hifenização, cabeçalho/rodapé, títulos de seção, chunking (página, seção, sobreposição), tokenização, RRF, persistência do store, busca híbrida com filtro por edital |
+| `test_agent.py` | conta de dias, cronograma proporcional, resolver edital por nome, loop completo com refs inventadas removidas, erro de ferramenta, limite de passos, histórico |
+| `test_gemini.py` | conversão de schema, formato de `contents`, assinatura coringa, parse de `functionCall`, embeddings em lotes de 100, 503 como erro transitório |
+| `test_fallback.py` | troca de modelo, pausa e volta pro principal, erro não transitório sobe direto |
+| `test_api.py` | upload + chat, PDF inválido, upload desligado, rate limit, sem chave, carga dos editais ao subir |
+
 ## Rodando localmente
 
 Precisa de Python 3.11+ e Node 20+. Banco é opcional: sem `DATABASE_URL`, os trechos ficam num store em memória salvo em `data/store`.
@@ -203,7 +342,7 @@ No plano gratuito o serviço dorme depois de 15 minutos sem uso, então a primei
 backend/
   app/
     agent/     loop do agente, ferramentas e prompt
-    llm/       interfaces de provedor, Gemini (REST) e fakes de teste
+    llm/       interfaces de provedor, Gemini (REST), fallback entre modelos e fakes de teste
     rag/       PDF, chunking, stores (memória e Postgres), busca híbrida
     main.py    API FastAPI
   scripts/     gerar editais de exemplo, seed, avaliação
@@ -266,6 +405,15 @@ cd ../frontend && npm install && npm run dev                   # http://localhos
 ```
 
 Tests (`pytest`) run fully offline using a scripted chat model and hashing embeddings.
+
+### Technical details
+
+- **Stack**: Python 3.11+, FastAPI, pypdf, numpy, psycopg 3 + pgvector (HNSW) + Postgres Portuguese full text; Gemini over REST with httpx (`gemini-3.8-flash` with lite fallbacks, `gemini-embedding-001` at 768 dims); React 18 + Vite 5 + TypeScript; pytest; multi-stage Docker on Render.
+- **Endpoints**: `GET /api/health`, `GET /api/editais`, `POST /api/editais` (multipart PDF upload), `POST /api/chat` (`{mensagem, historico, edital_id}` → `{resposta, citacoes, trace, passos, modelo, ms}`). The API is stateless; the client sends the last 8 messages.
+- **Data model**: `editais` and `trechos` tables; `trechos` holds page, section, text, `vector(768)` and a generated `tsvector`; HNSW and GIN indexes; RLS enabled with no policies; `prepare_threshold=None` for Supabase's transaction pooler.
+- **Parameters**: ~900-char chunks with 150-char overlap, 20 + 20 candidates fused with RRF (k = 60), 6 chunks to the model, BM25 k1 = 1.5 / b = 0.75, 6 agent steps, 5-minute cooldown for failing models.
+- **Wire format**: tools are declared as JSON Schema and converted to Gemini's uppercase types; the model's turn is echoed back verbatim with its `thoughtSignature`, as Gemini 3 requires.
+- **Tests**: 32 offline tests across RAG, agent loop, Gemini client, fallback and API.
 
 ### Deploy
 
