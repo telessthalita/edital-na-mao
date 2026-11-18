@@ -2,7 +2,7 @@ import numpy as np
 
 from app.rag.chunking import chunk_pages, is_heading
 from app.rag.models import Chunk, Hit
-from app.rag.pdf import clean_page_text
+from app.rag.pdf import clean_page_text, remove_repeated_lines
 from app.rag.retrieval import rrf, search
 from app.rag.store import MemoryStore
 from app.rag.text import tokenize
@@ -10,6 +10,25 @@ from app.rag.text import tokenize
 
 def test_clean_page_text_junta_hifenizacao():
     assert clean_page_text("as inscri-\nções   abertas") == "as inscrições abertas"
+
+
+def test_remove_cabecalho_e_rodape_repetidos():
+    assuntos = ["inscrições", "provas", "recursos"]
+    paginas = [
+        f"PREFEITURA DE X\nEdital 01/2026\n{i}.1 item\n{i}.2 item\n{i}.3 trata de {assuntos[i - 1]}\nPágina {i} de 3"
+        for i in range(1, 4)
+    ]
+    out = remove_repeated_lines(paginas)
+    assert out[0] == "1.1 item\n1.2 item\n1.3 trata de inscrições"
+    # linha do meio igual em toda página não é borda: fica
+    assert "2.2 item" in out[1]
+
+
+def test_pdf_de_exemplo_sem_rodape(pdfs):
+    from app.rag.pdf import extract_pages
+
+    paginas = extract_pages(pdfs[0].read_bytes())
+    assert not any("documento fictício" in p for p in paginas)
 
 
 def test_is_heading():

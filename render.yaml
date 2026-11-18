@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: edital-na-mao
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: ALLOW_UPLOAD
+        value: "false"
+      - key: RATE_LIMIT_CHAT_PER_HOUR
+        value: "30"
