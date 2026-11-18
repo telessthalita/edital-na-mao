@@ -48,7 +48,7 @@ O Edital na mão deixa a pessoa conversar com o edital. Toda resposta aponta a p
 - [x] Pergunta sobre algo que não está no edital volta "não achei no edital", sem inventar.
 - [x] Script de avaliação roda e mostra a tabela vetor x texto x híbrida.
 - [x] Frontend mostra resposta, citação e trace, rodando local de ponta a ponta.
-- [ ] Caminho de deploy combinado com a Thalita (ver abaixo) e documentado.
+- [x] Caminho de deploy combinado com a Thalita (ver abaixo) e documentado.
 - [x] README em português com versão em inglês recolhida, explicando arquitetura do agente, do RAG e as decisões.
 
 ## Stack e decisões
@@ -62,11 +62,12 @@ O Edital na mão deixa a pessoa conversar com o edital. Toda resposta aponta a p
 | Agente | Loop próprio | Dá pra explicar cada linha na entrevista |
 | Frontend | React + Vite + TypeScript | Stack do dia a dia |
 
-## Deploy proposto (a combinar)
-- Banco: Supabase gratuito (pgvector já vem).
-- API: Render, web service gratuito (dorme quando ninguém usa; primeira resposta demora).
-- Frontend: Render static site gratuito, ou servido pela própria API.
-- Nada pago. Nada vai pro ar sem a Thalita aprovar.
+## Deploy (combinado em 18/11/2026)
+- Só Render, web service gratuito via Docker. A API serve o frontend buildado: um serviço só.
+- Sem Supabase por enquanto: store em memória, e os editais de exemplo são carregados a cada vez que o serviço sobe.
+- Upload desligado e limite de perguntas por IP na demo.
+- Publicação fica pra depois, quando a Thalita decidir. Nada pago.
+- Supabase (pgvector no ar) fica como evolução; o `PgStore` ainda não rodou contra um Postgres real.
 
 ## Plano
 1. Esqueleto do repo, config e camada de provedor (Gemini + fakes de teste).

@@ -186,7 +186,16 @@ Os testes não usam rede: o Gemini é trocado por um modelo com roteiro (`Script
 
 ## Deploy
 
-Um serviço só: o `Dockerfile` builda o frontend e a API serve tudo. O `render.yaml` sobe no plano gratuito do Render com upload desligado. Sem `DATABASE_URL`, os editais de exemplo são recarregados a cada vez que o serviço sobe (são poucos trechos, custa segundos).
+Um serviço só: o `Dockerfile` builda o frontend e a API serve tudo. O `render.yaml` sobe no plano gratuito do Render com upload desligado e limite de perguntas por IP. Sem `DATABASE_URL`, os editais de exemplo são recarregados a cada vez que o serviço sobe (são poucos trechos, custa segundos).
+
+Pra publicar:
+
+1. Sobe o repositório pro GitHub.
+2. No Render: **New > Blueprint**, escolhe o repositório. Ele lê o `render.yaml`.
+3. Quando pedir, cola a `GEMINI_API_KEY`.
+4. Espera o build e abre `/api/health` pra conferir (`"ia": true`).
+
+No plano gratuito o serviço dorme depois de 15 minutos sem uso, então a primeira pergunta depois disso demora uns 50 segundos a mais.
 
 ## Estrutura
 
